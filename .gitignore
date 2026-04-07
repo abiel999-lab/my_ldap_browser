@@ -40,3 +40,11 @@ kubeconfig
 .phpunit.result.cache
 npm-debug.log
 yarn-error.log
+
+/storage/app/ldap-imports/
+/storage/app/private/
+/storage/app/*.csv
+/storage/app/*.ldif
+/storage/app/*.zip
+/storage/app/*_manifest.json
+/storage/app/livewire-tmp/
