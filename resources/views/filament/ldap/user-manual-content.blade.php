@@ -117,6 +117,100 @@
     </div>
 
     <div style="padding:22px;border-radius:20px;background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.08);">
+        <div style="font-size:24px;font-weight:800;color:#fff;">Keamanan Akses LDAP</div>
+
+        <div style="margin-top:14px;display:flex;flex-direction:column;gap:14px;font-size:15px;line-height:1.9;color:#d1d5db;">
+            <p>
+                Aplikasi ini menerapkan pengecekan koneksi LDAP secara otomatis saat proses login berlangsung.
+                Sistem akan mencoba melakukan koneksi ke server LDAP secara tersembunyi sebelum pengguna
+                dapat mengakses dashboard utama.
+            </p>
+
+            <p>
+                Jika koneksi LDAP tidak tersedia, misalnya karena pengguna tidak terhubung ke jaringan internal Petra
+                atau VPN tidak aktif, maka akses ke dashboard akan ditolak dan pengguna akan diarahkan ke halaman
+                peringatan khusus.
+            </p>
+
+            <p>
+                Mekanisme ini bertujuan untuk meningkatkan keamanan sistem, sehingga hanya pengguna yang berada
+                dalam jaringan resmi Petra yang dapat melakukan akses dan perubahan data LDAP.
+            </p>
+        </div>
+    </div>
+
+    <div style="padding:22px;border-radius:20px;background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.08);">
+        <div style="font-size:24px;font-weight:800;color:#fff;">Backup LDAP</div>
+
+        <div style="margin-top:14px;display:flex;flex-direction:column;gap:14px;font-size:15px;line-height:1.9;color:#d1d5db;">
+            <p>
+                Fitur Backup LDAP digunakan untuk membuat salinan data LDAP dalam bentuk file arsip (ZIP).
+                Backup ini dapat digunakan sebagai langkah pengamanan apabila terjadi kesalahan perubahan data
+                atau kebutuhan pemulihan sistem.
+            </p>
+
+            <p>
+                Pengguna dapat memilih scope backup, seperti seluruh LDAP atau hanya bagian tertentu dengan
+                menentukan Base DN secara spesifik.
+            </p>
+
+            <p>
+                Hasil backup akan disimpan dalam bentuk file yang dapat diunduh dan disimpan secara lokal.
+                Disarankan untuk melakukan backup secara berkala sebagai bagian dari prosedur operasional standar.
+            </p>
+        </div>
+    </div>
+
+    <div style="padding:22px;border-radius:20px;background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.08);">
+        <div style="font-size:24px;font-weight:800;color:#fff;">Export LDIF ZIP</div>
+
+        <div style="margin-top:14px;display:flex;flex-direction:column;gap:14px;font-size:15px;line-height:1.9;color:#d1d5db;">
+            <p>
+                Fitur Export LDIF ZIP digunakan untuk mengekspor data LDAP dalam format LDIF yang kemudian
+                dikompresi menjadi file ZIP.
+            </p>
+
+            <p>
+                Pengguna dapat menentukan data yang akan diekspor dengan menggunakan filter LDAP dan Base DN,
+                sehingga proses export dapat disesuaikan dengan kebutuhan tertentu, seperti hanya mengekspor user
+                atau bagian struktur tertentu saja.
+            </p>
+
+            <p>
+                File hasil export dapat digunakan untuk kebutuhan migrasi, analisis data, atau integrasi dengan sistem lain.
+            </p>
+        </div>
+    </div>
+
+    <div style="padding:22px;border-radius:20px;background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.08);">
+        <div style="font-size:24px;font-weight:800;color:#fff;">Import CSV / Excel</div>
+
+        <div style="margin-top:14px;display:flex;flex-direction:column;gap:14px;font-size:15px;line-height:1.9;color:#d1d5db;">
+            <p>
+                Fitur Import CSV / Excel memungkinkan pengguna untuk menambahkan atau memperbarui data user LDAP
+                secara massal menggunakan file CSV atau Excel.
+            </p>
+
+            <p>
+                File yang diunggah harus mengikuti format kolom yang sesuai dengan atribut LDAP yang digunakan,
+                seperti uid, cn, sn, mail, dan atribut lainnya.
+            </p>
+
+            <p>
+                Mode import dapat dipilih antara membuat data baru atau memperbarui data yang sudah ada.
+                Sistem akan memproses setiap baris data dan memberikan hasil berupa jumlah data yang berhasil
+                dan gagal diproses.
+            </p>
+
+            <p>
+                Disarankan untuk melakukan validasi file sebelum import dan melakukan backup terlebih dahulu
+                untuk menghindari kesalahan massal pada data LDAP.
+            </p>
+        </div>
+    </div>
+
+
+    <div style="padding:22px;border-radius:20px;background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.08);">
         <div style="font-size:24px;font-weight:800;color:#fff;">Hal yang Perlu Diperhatikan</div>
 
         <div style="margin-top:14px;display:flex;flex-direction:column;gap:14px;font-size:15px;line-height:1.9;color:#d1d5db;">

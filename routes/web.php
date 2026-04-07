@@ -6,6 +6,10 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/auth_callback', [AuthController::class, 'callback'])->name('auth.callback');
 
+Route::get('/petra-network-required', function () {
+    return view('petra-network-required');
+})->name('petra.network.required');
+
 if (app()->environment('local') && filter_var(env('LOCAL_ADMIN_ENABLED', false), FILTER_VALIDATE_BOOL)) {
     Route::get('/login', [LocalLoginController::class, 'showLoginForm'])->name('local.login');
     Route::post('/login', [LocalLoginController::class, 'login'])->name('local.login.submit');

@@ -22,6 +22,7 @@ use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use TomatoPHP\FilamentPWA\FilamentPWAPlugin;
+use App\Http\Middleware\EnsurePetraNetworkForPanel;
 
 class AppPanelProvider extends PanelProvider
 {
@@ -59,6 +60,7 @@ class AppPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 AuthenticatePanelAccess::class,
+                EnsurePetraNetworkForPanel::class,
             ], isPersistent: true)
             ->userMenuItems([
                 Action::make('user_menu_item_user_manual')

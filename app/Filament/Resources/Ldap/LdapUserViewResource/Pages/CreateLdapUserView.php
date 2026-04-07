@@ -17,7 +17,7 @@ class CreateLdapUserView extends CreateRecord
 {
     protected static string $resource = LdapUserViewResource::class;
 
-    protected static bool $canCreateAnother = false;
+    protected static bool $canCreateAnother = true;
 
     protected function handleRecordCreation(array $data): Model
     {
