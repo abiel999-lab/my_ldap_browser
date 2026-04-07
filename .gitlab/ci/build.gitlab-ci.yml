@@ -1,0 +1,9 @@
+build image:
+  extends:
+    - .rules_build
+    - .build_image_template
+
+build worker image:
+  extends:
+    - .rules_worker_build
+    - .worker_build_image_template

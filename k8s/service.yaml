@@ -1,0 +1,15 @@
+#service
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${CI_PROJECT_NAME} #sesuaikan dengan nama deployment
+  labels:
+    app: ${CI_PROJECT_NAME} #sesuaikan dengan nama deployment
+spec:
+  selector:
+    app: ${CI_PROJECT_NAME} #sesuaikan dengan nama deployment
+  ports:
+    - name: "http"
+      port: 80
+      targetPort: 8000
+  type: ClusterIP

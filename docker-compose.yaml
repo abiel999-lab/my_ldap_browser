@@ -1,0 +1,29 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.local
+    ports:
+      - "8020:8000"
+    volumes:
+      - .:/app
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      APP_ENV: local
+      APP_DEBUG: "true"
+    depends_on:
+      - redis
+  vite:
+    image: node:24-alpine
+    working_dir: /app
+    volumes:
+      - .:/app
+    command: npm run dev
+    ports:
+      - "5173:5173"
+    depends_on:
+      - web
+  redis:
+    restart: always
+    image: petrahub.petra.ac.id/eksternal/redis

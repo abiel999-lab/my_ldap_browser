@@ -1,0 +1,74 @@
+# CONFIG
+dev:deploy config:
+  needs: []
+  artifacts:
+    paths:
+      - $DEPLOYMENT_DIR/*.yaml
+      - .gitlab/ci/templates/config.gitlab-ci.yml
+    expire_in: 1 week
+  extends:
+    - .variable_dev
+    - .rules_config_dev
+    - .config_template
+# END CONFIG
+
+# DEPLOY
+dev:deploy redis:
+  needs:
+    - dev:deploy config
+  extends:
+    - .variable_dev
+    - .rules_config_dev
+    - .deploy_redis_template
+
+dev:deploy deployment:
+  needs:
+    - build image
+  extends:
+    - .variable_dev
+    - .rules_dev
+    - .deploy_image_template
+
+dev:deploy hpa:
+  needs:
+    - dev:deploy config
+  extends:
+    - .variable_dev
+    - .rules_config_dev
+    - .deploy_hpa_template
+
+dev:deploy service:
+  needs:
+    - dev:deploy config
+  extends:
+    - .variable_dev
+    - .rules_config_dev
+    - .deploy_service_template
+
+dev:deploy ingress:
+  needs:
+    - dev:deploy service
+  extends:
+    - .variable_dev
+    - .rules_config_dev
+    - .deploy_ingress_template
+# END DEPLOY
+
+# Worker
+dev:deploy worker:
+  needs:
+    - build worker image
+  extends:
+    - .variable_dev
+    - .rules_worker_dev
+    - .worker_deploy_image_template
+
+dev:deploy worker hpa:
+  needs:
+    - dev:deploy config
+  extends:
+    - .variable_dev
+    - .rules_config_worker_dev
+    - .worker_deploy_hpa_template
+
+# End Worker

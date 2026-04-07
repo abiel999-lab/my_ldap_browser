@@ -1,0 +1,47 @@
+#configmap
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: ${CI_PROJECT_NAME}-env
+  labels:
+    app: ${CI_PROJECT_NAME}-env
+data:
+  # Configuration values can be set as key-value properties
+  APP_NAME: "${APP_NAME}"
+  APP_ENV: "${APP_ENV}"
+  APP_DEBUG: "${APP_DEBUG}"
+  APP_KEY: "${APP_KEY}"
+  APP_URL: "https://${INGRESS_URL}"
+  APP_ID: "${APP_ID}"
+  APP_KODE: "${APP_KODE}"
+  APP_USE_ROLE_ROUTE: "false"
+  LOG_CHANNEL: "stack-stdrerr"
+  LOG_LEVEL: "debug"
+  LOG_LEVEL_SLACK: "critical"
+  BROADCAST_DRIVER: "log"
+  CACHE_DRIVER: "redis"
+  FILESYSTEM_DISK: "s3"
+  QUEUE_CONNECTION: "redis"
+  SESSION_DRIVER: "redis"
+  SESSION_LIFETIME: "120"
+  REDIS_HOST: "${CI_PROJECT_NAME}-redis.${NAMESPACE}"
+  REDIS_PORT: "6379"
+  REDIS_CLIENT: "phpredis"
+  REDIS_PASSWORD: ""
+  SESSION_CONNECTION: session
+  DB_CONNECTION: "pgsql"
+  IP_WHITELIST: "${IP_WHITELIST}"
+  DB_SCHEMA: "${DB_SCHEMA}"
+  DISCLAIMER_SERVICE_URL: "https://tnc.petra.ac.id"
+  AUTH_SERVICE_URL: ${AUTH_SERVICE_URL}
+  GATE_SERVICE_URL: ${GATE_SERVICE_URL}
+  AUTH_SERVICE_URL_API: ${AUTH_SERVICE_API}
+  GATE_SERVICE_URL_API: ${GATE_SERVICE_API}
+  APP_URL_API: "${CI_PROJECT_NAME}.${NAMESPACE}"
+  OCTANE_SERVER: frankenphp
+  APP_VERSION: "${CI_COMMIT_TAG}"
+  APP_YEAR: "${APP_YEAR}"
+  MAIL_MAILER: "${MAIL_MAILER}"
+  MAIL_FROM_ADDRESS: "${MAIL_FROM_ADDRESS}"
+  MAIL_FROM_NAME: "${MAIL_FROM_NAME}"
+  ENABLE_SCHEDULER: "${ENABLE_SCHEDULER}"

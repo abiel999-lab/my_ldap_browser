@@ -1,0 +1,33 @@
+# Default: force LF everywhere
+* text=auto eol=lf
+
+# Windows-only scripts
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Diff helpers
+*.blade.php diff=html
+*.css diff=css
+*.html diff=html
+*.md diff=markdown
+*.php diff=php
+
+# Binary
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.gif binary
+*.bmp binary
+*.tiff binary
+*.ico binary
+*.svg binary
+*.ttf binary
+*.eot binary
+*.woff binary
+*.woff2 binary
+
+# Export ignore
+/.github export-ignore
+CHANGELOG.md export-ignore
+.styleci.yml export-ignore

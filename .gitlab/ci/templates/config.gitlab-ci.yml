@@ -1,0 +1,71 @@
+.config_template:
+  stage: config
+  image:
+    name: petrahub.petra.ac.id/eksternal/bitnami-kubectl
+    entrypoint: [""]
+  variables:
+    CONFIG_FILE: config.yaml
+  before_script:
+    # 1. Define the dynamic variable helper function (dibuat untuk memudahkan penggantian variabel yang memiliki suffix env seperti _DEV, _PROD, dll.)
+    - get_var() { local target_var="${1}_${ENV_SUFFIX}"; echo "${!target_var}"; }
+
+    # 2. Standard Logic
+    - if [[ "$CI_COMMIT_TAG" =~ v[0-9].+ ]]; then IMAGE_REGISTRY_TAG=$CI_COMMIT_TAG; fi
+    - CLEAN_PROJECT_NAME=$(echo "$CI_PROJECT_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | tr -s '-' | sed 's/^-//; s/-$//')
+
+    # 3. Static Replacements (untuk variabel yang tidak memiliki suffix env)
+    - sed -i "s/\${CI_PROJECT_NAME}/$CLEAN_PROJECT_NAME/g" $DEPLOYMENT_DIR/*.yaml
+    - sed -i "s/\${IMAGE_REGISTRY_TAG}/$IMAGE_REGISTRY_TAG/g" $DEPLOYMENT_DIR/*.yaml
+    - sed -i "s/\${PROJECT_GROUP}/$PROJECT_GROUP/g" $DEPLOYMENT_DIR/*.yaml
+    - sed -i "s/\${NAMESPACE}/$NAMESPACE/g" $DEPLOYMENT_DIR/*.yaml
+    - sed -i "s/\${APP_NAME}/$APP_NAME/g" $DEPLOYMENT_DIR/*.yaml
+    - sed -i "s/\${LOG_CHANNEL}/$LOG_CHANNEL/g" $DEPLOYMENT_DIR/*.yaml
+    - sed -i "s/\${DB_SCHEMA}/$DB_SCHEMA/g" $DEPLOYMENT_DIR/*.yaml
+    - sed -i "s/\${ROLE_PEJABAT}/$ROLE_PEJABAT/g" $DEPLOYMENT_DIR/*.yaml
+    - sed -i "s|\${APP_YEAR}|$APP_YEAR|g" $DEPLOYMENT_DIR/*.yaml
+    - sed -i "s|\${CI_COMMIT_TAG}|$CI_COMMIT_TAG|g" $DEPLOYMENT_DIR/*.yaml
+    - sed -i "s|\${MAIL_MAILER}|$MAIL_MAILER|g" $DEPLOYMENT_DIR/*.yaml
+    - sed -i "s|\${MAIL_FROM_ADDRESS}|$MAIL_FROM_ADDRESS|g" $DEPLOYMENT_DIR/*.yaml
+    - sed -i "s|\${MAIL_FROM_NAME}|$MAIL_FROM_NAME|g" $DEPLOYMENT_DIR/*.yaml
+
+    # Variable from .gitlab-ci.yml
+    - sed -i "s/\${APP_ID}/$APP_ID/g" $DEPLOYMENT_DIR/*.yaml
+    - sed -i "s/\${APP_KODE}/$APP_KODE/g" $DEPLOYMENT_DIR/*.yaml
+    - sed -i "s/\${APP_ENV}/$APP_ENV/g" $DEPLOYMENT_DIR/*.yaml
+    - sed -i "s/\${APP_DEBUG}/$APP_DEBUG/g" $DEPLOYMENT_DIR/*.yaml
+    - sed -i "s|\${ENABLE_SCHEDULER}|$ENABLE_SCHEDULER|g" $DEPLOYMENT_DIR/*.yaml
+
+    # 4. Dynamic Replacements (untuk variabel yang memiliki suffix env, menggunakan helper function)
+    - sed -i "s|\${APP_KEY}|$(get_var APP_KEY)|g" $DEPLOYMENT_DIR/*.yaml
+    - sed -i "s/\${INGRESS_URL}/$INGRESS_URL/g" $DEPLOYMENT_DIR/*.yaml
+    - sed -i "s|\${IP_WHITELIST}|$(get_var IP_WHITELIST)|g" $DEPLOYMENT_DIR/*.yaml
+    - sed -i "s|\${KUBERNETES_CIDR}|$(get_var KUBERNETES_CIDR)|g" $DEPLOYMENT_DIR/*.yaml
+    - sed -i "s|\${AUTH_SERVICE_URL}|$(get_var AUTH_SERVICE_URL)|g" $DEPLOYMENT_DIR/*.yaml
+    - sed -i "s|\${GATE_SERVICE_URL}|$(get_var GATE_SERVICE_URL)|g" $DEPLOYMENT_DIR/*.yaml
+    - sed -i "s|\${AUTH_SERVICE_API}|$(get_var AUTH_SERVICE_API)|g" $DEPLOYMENT_DIR/*.yaml
+    - sed -i "s|\${GATE_SERVICE_API}|$(get_var GATE_SERVICE_API)|g" $DEPLOYMENT_DIR/*.yaml
+  script: #sesuaikan dengan kebutuhan
+    # Redeclare function for the script block (GitLab runs before_script and script in slightly different shell contexts sometimes)
+    - get_var() { local target_var="${1}_${ENV_SUFFIX}"; echo "${!target_var}"; }; get_var_name() { echo "${1}_${ENV_SUFFIX}"; }
+
+    - echo -n $(get_var KUBE_CONFIG) | base64 -d > $KUBECONFIG; echo "using variable:" $(get_var_name KUBE_CONFIG)
+
+    - kubectl create namespace $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+    - kubectl create secret docker-registry petrahub --docker-server=$IMAGE_REGISTRY --docker-username=$IMAGE_REGISTRY_USER --docker-password=$IMAGE_REGISTRY_PASSWORD -n $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+    - kubectl create secret generic sso --from-literal=SSO_COOKIE=$SSO_COOKIE --from-literal=SSO_DOMAIN=$SSO_DOMAIN -n $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+
+    # Dynamic Secrets (variabel yang memiliki suffix env seperti _DEV, _PROD, dll.)
+    - kubectl create secret generic aws --from-literal=AWS_ACCESS_KEY_ID=$(get_var AWS_ACCESS_KEY_ID) --from-literal=AWS_SECRET_ACCESS_KEY=$(get_var AWS_SECRET_ACCESS_KEY) --from-literal=AWS_DEFAULT_REGION=us-east-1 --from-literal=AWS_BUCKET=$(get_var AWS_BUCKET) --from-literal=AWS_URL=$(get_var AWS_URL) --from-literal=AWS_ENDPOINT=$(get_var AWS_ENDPOINT) --from-literal=AWS_USE_PATH_STYLE_ENDPOINT=$(get_var AWS_USE_PATH_STYLE_ENDPOINT) -n $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+    - kubectl create secret generic mail --from-literal=MAIL_API_URL=$MAIL_API_URL --from-literal=MAIL_HOST=$MAIL_HOST --from-literal=MAIL_USERNAME=$MAIL_USERNAME --from-literal=MAIL_PASSWORD=$MAIL_PASSWORD --from-literal=MAIL_PORT=$MAIL_PORT --from-literal=MAIL_IS_TRIAL=1 -n $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+
+    - kubectl create secret generic db --from-literal=DB_URL=$(get_var DB_URL) --from-literal=DB_PORT_READ=$(get_var DB_PORT_READ) -n $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+    - kubectl create secret generic neosim --from-literal=NEOSIM_DB_URL=$(get_var NEOSIM_DB_URL) --from-literal=NEOSIM_DB_PORT_READ=$(get_var NEOSIM_DB_PORT_READ) -n $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+    - kubectl create secret generic gate --from-literal=GATE_DB_URL=$(get_var GATE_DB_URL) --from-literal=GATE_DB_PORT_READ=$(get_var GATE_DB_PORT_READ) -n $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+    - kubectl create secret generic simsia --from-literal=AKAD_DB_URL=$(get_var AKAD_DB_URL) -n $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+    - kubectl create secret generic simsip --from-literal=SIP_DB_URL=$(get_var SIP_DB_URL) -n $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+    - kubectl create secret generic simmutu  --from-literal=MUTU_DB_URL=$(get_var MUTU_DB_URL) -n $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+
+    # Static Secrets (variabel yang tidak memiliki suffix env, langsung dibuat tanpa menggunakan helper function)
+    - kubectl create secret generic dbbak  --from-literal=BAK_DB_URL=$(get_var BAK_DB_URL) -n $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+
+    - kubectl apply -f $DEPLOYMENT_DIR/$CONFIG_FILE -n $NAMESPACE

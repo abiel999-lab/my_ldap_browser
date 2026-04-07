@@ -1,0 +1,69 @@
+# CONFIG
+prod:deploy config:
+  needs: []
+  extends:
+    - .variable_prod
+    - .rules_config_prod
+    - .config_template
+# END CONFIG
+
+# DEPLOY
+prod:deploy redis:
+  needs:
+    - prod:deploy config
+  extends:
+    - .variable_prod
+    - .rules_config_prod
+    - .deploy_redis_template
+
+prod:deploy deployment:
+  needs:
+    - build image
+  extends:
+    - .variable_prod
+    - .rules_prod
+    - .deploy_image_template
+
+prod:deploy hpa:
+  needs:
+    - prod:deploy config
+  extends:
+    - .variable_prod
+    - .rules_config_prod
+    - .deploy_hpa_template
+
+prod:deploy service:
+  needs:
+    - prod:deploy config
+  extends:
+    - .variable_prod
+    - .rules_config_prod
+    - .deploy_service_template
+
+prod:deploy ingress:
+  needs:
+    - prod:deploy service
+  extends:
+    - .variable_prod
+    - .rules_config_prod
+    - .deploy_ingress_template
+# END DEPLOY
+
+# Worker
+prod:deploy worker:
+  needs:
+    - build worker image
+  extends:
+    - .variable_prod
+    - .rules_worker_prod
+    - .worker_deploy_image_template
+
+prod:deploy worker hpa:
+  needs:
+    - prod:deploy config
+  extends:
+    - .variable_prod
+    - .rules_config_worker_prod
+    - .worker_deploy_hpa_template
+
+# End Worker

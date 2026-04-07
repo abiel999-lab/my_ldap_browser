@@ -1,0 +1,65 @@
+#variable yang harus diset dahulu di setting CI/CD gitlab
+#NAMESPACE: untuk namespace kubernetes
+#PROJECT_GROUP: untuk group ketika build image container
+
+include:
+  - ".gitlab/ci/templates/build.gitlab-ci.yml"
+  - ".gitlab/ci/templates/config.gitlab-ci.yml"
+  - ".gitlab/ci/templates/deploy.gitlab-ci.yml"
+  - ".gitlab/ci/templates/rules.gitlab-ci.yml"
+  - ".gitlab/ci/templates/worker-rules.gitlab-ci.yml"
+  - ".gitlab/ci/templates/worker.gitlab-ci.yml"
+  - ".gitlab/ci/build.gitlab-ci.yml"
+  - ".gitlab/ci/dev.gitlab-ci.yml"
+  - ".gitlab/ci/prod.gitlab-ci.yml"
+
+#stage yang akan dijalankan gitlab-runner
+stages:
+  - build
+  - config
+  - redis
+  - deploy
+  - service
+  - hpa
+  - ingress
+
+#global variable
+variables:
+  ENABLE_WORKER: "false" #ubah ke "true" jika ingin menggunakan worker untuk menjalankan task background seperti queue, dll.
+  ENABLE_SCHEDULER: "false" # ubah ke "true" jika ingin menggunakan scheduler.
+  KUBECONFIG: .gitlab/KUBECONFIG #lokasi file kubeconfig untuk akses ke cluster kubernetes, jangan diganti jika tidak tahu apa itu kubeconfig
+  DEPLOYMENT_DIR: "k8s"
+  DEPLOYMENT_WORKER_DIR: "k8s/worker"
+  DOCKER_DIR: "docker" #lokasi file Dockerfile untuk build image container, jangan diganti jika tidak tahu apa itu Dockerfile
+  DOCKER_DIR_WORKER: "docker/worker" #lokasi file Dockerfile untuk build image container worker, jangan diganti jika tidak tahu apa itu Dockerfile
+  NAMESPACE: "template" #sesuaikan dengan nama project group. cth: renstra
+  IMAGE_REGISTRY_TAG: "$CI_COMMIT_BRANCH" #default tag apabila belum ke production untuk diberi versi
+  PROJECT_GROUP: "ppsi" #group folder project berada (jangan diganti jika project berada di PPSI)
+  APP_NAME: "Template Filament"
+  APP_YEAR: "2025" #sesuaikan dengan tahun awal pembuatan aplikasi
+  MAIL_FROM_ADDRESS: "" #sesuaikan dengan email yang digunakan untuk mengirim email dari aplikasi
+  MAIL_FROM_NAME: "" #sesuaikan dengan nama yang digunakan untuk mengirim email dari aplikasi
+  DB_SCHEMA: "template" #sesuaikan dengan nama schema database yang digunakan, default template
+
+.variable_dev:
+  variables:
+    TAG_SUFFIX: "-dev"
+    ENV_SUFFIX: "DEV"
+    APP_ID: 119
+    APP_KODE: "template"
+    INGRESS_URL: "template-dev.petra.ac.id"
+    APP_DEBUG: "true"
+    APP_ENV: "development"
+
+.variable_prod:
+  variables:
+    TAG_SUFFIX: ""
+    ENV_SUFFIX: "PROD"
+    APP_ID: 119
+    APP_KODE: "template"
+    INGRESS_URL: "template.petra.ac.id"
+    APP_DEBUG: "false"
+    APP_ENV: "production"
+
+# Tidak diperbolehkan menambahkan variabel lingkungan (env) dengan nilai langsung di sini. Variabel lingkungan harus ditambahkan melalui CI/CD Variables!
+# Informasi sensitif seperti kredensial database, email, dan lain-lain (username, password, IP, dll.) tidak boleh dimasukkan secara langsung di sini.

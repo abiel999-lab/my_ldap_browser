@@ -1,0 +1,60 @@
+#deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${CI_PROJECT_NAME}
+  labels:
+    app: ${CI_PROJECT_NAME}
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: ${CI_PROJECT_NAME}
+  template:
+    metadata:
+      labels:
+        app: ${CI_PROJECT_NAME}
+      annotations:
+        commit-branch: "${CI_COMMIT_BRANCH}"
+        commit-sha: "${CI_COMMIT_SHORT_SHA}"
+        gitlab-job-id: "${CI_JOB_ID}"
+    spec:
+      containers:
+        - name: ${CI_PROJECT_NAME}
+          image: ${IMAGE_REGISTRY}/${PROJECT_GROUP}/${NAMESPACE}/${CI_PROJECT_NAME}:${IMAGE_REGISTRY_TAG}
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+          envFrom: #env dari configmap dan secret disesuaikan dengan kebutuhan di config
+            - configMapRef:
+                name: ${CI_PROJECT_NAME}-env
+            - secretRef:
+                name: sso
+            - secretRef:
+                name: neosim
+            - secretRef:
+                name: gate
+            - secretRef:
+                name: mail
+            - secretRef:
+                name: simsia
+            - secretRef:
+                name: simsip
+            - secretRef:
+                name: simmutu
+            - secretRef:
+                name: dbbak
+            - secretRef:
+                name: db
+            - secretRef:
+                name: aws
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "1000m"
+      imagePullSecrets:
+        - name: petrahub

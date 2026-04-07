@@ -1,0 +1,13 @@
+#untuk build image docker dan kirim ke registry sesuai variable IMAGE_REGISTRY yang ada di gitlab-runner
+.build_image_template:
+  stage: build
+  image:
+    name: petrahub.petra.ac.id/eksternal/kaniko-executor:v1.9.0-debug
+    entrypoint: [""]
+  script:
+    - if [[ "$CI_COMMIT_TAG" =~ v[0-9].+ ]]; then IMAGE_REGISTRY_TAG=$CI_COMMIT_TAG; fi #bila commit tag tidak diberi maka pakai default
+    - mkdir -p /kaniko/.docker
+    - echo $IMAGE_REGISTRY/$PROJECT_GROUP/$NAMESPACE/$CI_PROJECT_NAME:$IMAGE_REGISTRY_TAG
+    - echo "{\"auths\":{\"$IMAGE_REGISTRY\":{\"username\":\"$IMAGE_REGISTRY_USER\",\"password\":\"$IMAGE_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
+    - /kaniko/executor --cache=true --cache-copy-layers --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/$DOCKER_DIR/Dockerfile --destination $IMAGE_REGISTRY/$PROJECT_GROUP/$NAMESPACE/$CI_PROJECT_NAME:$IMAGE_REGISTRY_TAG
+  retry: 2

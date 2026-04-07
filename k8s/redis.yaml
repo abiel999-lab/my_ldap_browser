@@ -1,0 +1,47 @@
+#redis
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${CI_PROJECT_NAME}-redis
+  labels:
+    app: ${CI_PROJECT_NAME}-redis
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: ${CI_PROJECT_NAME}-redis
+  template:
+    metadata:
+      labels:
+        app: ${CI_PROJECT_NAME}-redis
+    spec:
+      containers:
+      - name: ${CI_PROJECT_NAME}-redis
+        image: petrahub.petra.ac.id/eksternal/redis
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 6379
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "1024Mi"
+            cpu: "1000m"
+---
+#service redis
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${CI_PROJECT_NAME}-redis
+  labels:
+    app: ${CI_PROJECT_NAME}-redis
+spec:
+  selector:
+    app: ${CI_PROJECT_NAME}-redis
+  ports:
+  - name: "${CI_PROJECT_NAME}-redis"
+    port: 6379
+    targetPort: 6379
+  type: ClusterIP

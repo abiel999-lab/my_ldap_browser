@@ -1,0 +1,70 @@
+# Rule untuk Pipeline
+.rules_worker_build:
+  rules:
+    # always: dev,prod || always: dev
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/ && $CI_COMMIT_TAG_MESSAGE =~ /(?i)always:\s*dev(,\s*prod)?/ && $ENABLE_WORKER == "true"
+      when: on_success
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/ && $ENABLE_WORKER == "true"
+      when: manual
+    - if: $CI_COMMIT_BRANCH == "dev" && $ENABLE_WORKER == "true"
+      when: always
+    - when: never
+
+# Rule untuk Deploy Config / Ingress / Service ke DEV
+.rules_config_worker_dev:
+  rules:
+    # 1. Jika ada Tag + Message "always: dev", DAN ada file k8s yang berubah -> Auto Run
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/ && $CI_COMMIT_TAG_MESSAGE =~ /(?i)always:\s*dev(,\s*prod)?/ && $ENABLE_WORKER == "true"
+      changes:
+        - k8s/**/*
+      when: on_success
+
+    # 2. Jika branch "dev" DAN ada file k8s yang berubah -> Auto Run
+    - if: $CI_COMMIT_BRANCH == "dev" && $ENABLE_WORKER == "true"
+      changes:
+        - k8s/**/*
+      when: always
+
+    # 3. MANUAL FALLBACK: Jika tidak ada file yang berubah, tapi ini branch dev atau tag,
+    # jadikan tombol Play (berguna jika kamu ubah variable di UI)
+    - if: ( $CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/ ) && $ENABLE_WORKER == "true"
+      when: manual
+      allow_failure: true
+
+    - when: never
+
+# Rule untuk Deploy Config / Ingress / Service ke PROD
+.rules_config_worker_prod:
+  rules:
+    # 1. Jika ada Tag + Message "always: prod", DAN ada file k8s yang berubah -> Auto Run
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/ && ( $CI_COMMIT_TAG_MESSAGE =~ /(?i)always:\s*prod?/ || $CI_COMMIT_TAG_MESSAGE =~ /(?i)always:\s*dev,\s*prod/ ) && $ENABLE_WORKER == "true"
+      changes:
+        - k8s/**/*
+      when: on_success
+
+    # 2. MANUAL FALLBACK: Jika tidak ada file k8s berubah pada Tag, jadikan tombol Play.
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/ && $ENABLE_WORKER == "true"
+      when: manual
+      allow_failure: true
+
+    - when: never
+
+.rules_worker_dev:
+  rules:
+    #always: dev,prod || always: dev
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/ && $CI_COMMIT_TAG_MESSAGE =~ /(?i)always:\s*dev(,\s*prod)?/ && $ENABLE_WORKER == "true"
+      when: on_success
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/ && $ENABLE_WORKER == "true"
+      when: manual
+    - if: $CI_COMMIT_BRANCH == "dev" && $ENABLE_WORKER == "true"
+      when: always
+    - when: never
+
+.rules_worker_prod:
+  rules:
+    # always: dev,prod || always: prod
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/ && ( $CI_COMMIT_TAG_MESSAGE =~ /(?i)always:\s*prod?/ || $CI_COMMIT_TAG_MESSAGE =~ /(?i)always:\s*dev,\s*prod/ ) && $ENABLE_WORKER == "true"
+      when: on_success
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/ && $ENABLE_WORKER == "true"
+      when: manual
+    - when: never
