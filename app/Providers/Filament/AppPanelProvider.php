@@ -4,6 +4,8 @@ namespace App\Providers\Filament;
 
 use App\Filament\Resources\Ldap\LdapUserManualResource;
 use App\Http\Middleware\AuthenticatePanelAccess;
+use App\Http\Middleware\EnsurePetraNetworkForPanel;
+use App\Http\Middleware\EnsureSamlAdminRoleWeb;
 use Filament\Actions\Action;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -22,7 +24,6 @@ use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use TomatoPHP\FilamentPWA\FilamentPWAPlugin;
-use App\Http\Middleware\EnsurePetraNetworkForPanel;
 
 class AppPanelProvider extends PanelProvider
 {
@@ -38,7 +39,6 @@ class AppPanelProvider extends PanelProvider
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
-            // ->discoverClusters(in: app_path('Filament/Clusters'), for: 'App\\Filament\\Clusters')
             ->pages([
                 Dashboard::class,
             ])
@@ -59,6 +59,7 @@ class AppPanelProvider extends PanelProvider
                 DispatchServingFilamentEvent::class,
             ])
             ->authMiddleware([
+                EnsureSamlAdminRoleWeb::class,
                 AuthenticatePanelAccess::class,
                 EnsurePetraNetworkForPanel::class,
             ], isPersistent: true)
