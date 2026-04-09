@@ -3,7 +3,6 @@
 namespace App\Http;
 
 use App\Http\Middleware\Authenticate;
-use App\Http\Middleware\AuthenticateSSO;
 use App\Http\Middleware\DevelopmentOnly;
 use App\Http\Middleware\DisclaimerAgreement;
 use App\Http\Middleware\EncryptCookies;
@@ -34,15 +33,7 @@ use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 class Kernel extends HttpKernel
 {
-    /**
-     * The application's global HTTP middleware stack.
-     *
-     * These middleware are run during every request to your application.
-     *
-     * @var array<int, class-string|string>
-     */
     protected $middleware = [
-        // \App\Http\Middleware\TrustHosts::class,
         TrustProxies::class,
         HandleCors::class,
         PreventRequestsDuringMaintenance::class,
@@ -51,11 +42,6 @@ class Kernel extends HttpKernel
         ConvertEmptyStringsToNull::class,
     ];
 
-    /**
-     * The application's route middleware groups.
-     *
-     * @var array<string, array<int, class-string|string>>
-     */
     protected $middlewareGroups = [
         'web' => [
             EncryptCookies::class,
@@ -67,24 +53,14 @@ class Kernel extends HttpKernel
         ],
 
         'api' => [
-            // \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
-            // 'throttle:api',
             SubstituteBindings::class,
         ],
     ];
 
-    /**
-     * The application's route middleware.
-     *
-     * These middleware may be assigned to groups or used individually.
-     *
-     * @var array<string, class-string|string>
-     */
     protected $routeMiddleware = [
         'auth' => Authenticate::class,
         'auth.basic' => AuthenticateWithBasicAuth::class,
         'auth.session' => AuthenticateSession::class,
-        'auth.sso' => AuthenticateSSO::class, // --------untuk cek sso
         'cache.headers' => SetCacheHeaders::class,
         'can' => Authorize::class,
         'guest' => RedirectIfAuthenticated::class,
@@ -92,10 +68,10 @@ class Kernel extends HttpKernel
         'signed' => ValidateSignature::class,
         'throttle' => ThrottleRequests::class,
         'verified' => EnsureEmailIsVerified::class,
-        'dev' => DevelopmentOnly::class, // -------- untuk cek apakah sekarang jalan di development
-        'user.umum' => IsUserUmum::class, // ---------untuk cek apakah user merupakan orang luar Petra
-        'role' => UserHasRole::class, // ------------ cek apakah user punya role untuk otoritas
-        'ip.filter' => IpFilter::class, // ------------ cek apakah user punya role untuk otoritas
-        'disclaimer.agreement' => DisclaimerAgreement::class, // ------------ cek disclaimer
+        'dev' => DevelopmentOnly::class,
+        'user.umum' => IsUserUmum::class,
+        'role' => UserHasRole::class,
+        'ip.filter' => IpFilter::class,
+        'disclaimer.agreement' => DisclaimerAgreement::class,
     ];
 }

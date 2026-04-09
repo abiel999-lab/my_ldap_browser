@@ -4,8 +4,8 @@ namespace App\Providers\Filament;
 
 use App\Filament\Resources\Ldap\LdapUserManualResource;
 use App\Http\Middleware\AuthenticatePanelAccess;
+use App\Http\Middleware\EnsureOidcAdminRoleWeb;
 use App\Http\Middleware\EnsurePetraNetworkForPanel;
-use App\Http\Middleware\EnsureSamlAdminRoleWeb;
 use Filament\Actions\Action;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -21,7 +21,6 @@ use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use TomatoPHP\FilamentPWA\FilamentPWAPlugin;
 
@@ -59,8 +58,8 @@ class AppPanelProvider extends PanelProvider
                 DispatchServingFilamentEvent::class,
             ])
             ->authMiddleware([
-                EnsureSamlAdminRoleWeb::class,
                 AuthenticatePanelAccess::class,
+                EnsureOidcAdminRoleWeb::class,
                 EnsurePetraNetworkForPanel::class,
             ], isPersistent: true)
             ->userMenuItems([
@@ -68,17 +67,6 @@ class AppPanelProvider extends PanelProvider
                     ->label('User Manual')
                     ->url(fn (): string => LdapUserManualResource::getUrl('index'))
                     ->icon('heroicon-o-book-open'),
-
-                Action::make('user_menu_item_gate_pcu')
-                    ->label('Gate PCU')
-                    ->icon('heroicon-o-square-2-stack')
-                    ->url(fn (): string => config('url.service.gate')),
-
-                Action::make('user_menu_item_login_as_logout')
-                    ->label('Log Out As')
-                    ->icon('heroicon-o-user-circle')
-                    ->url(fn (): string => route('loginas.logout'))
-                    ->visible(fn (): bool => Auth::check() && session()->has('login_as')),
             ])
             ->renderHook(PanelsRenderHook::SIDEBAR_NAV_START, function (): string {
                 return view('filament.partials.sidebar-pin-toggle', [

@@ -4,17 +4,22 @@ namespace App\Services\Ldap;
 
 use App\Models\LdapSchemaEntry;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 
 class LdapSchemaBrowserService
 {
+    protected ?array $schemaCache = null;
+
     public function getAll(?string $search = null, ?string $type = null): Collection
     {
+        $schema = $this->readSchema();
+
         $entries = collect()
-            ->merge($this->getObjectClasses())
-            ->merge($this->getAttributeTypes())
-            ->merge($this->getMatchingRules())
-            ->merge($this->getMatchingRuleUse())
-            ->merge($this->getSyntaxes());
+            ->merge($this->mapSchemaValuesFromSchema($schema, 'objectClasses', 'objectClass'))
+            ->merge($this->mapSchemaValuesFromSchema($schema, 'attributeTypes', 'attributeType'))
+            ->merge($this->mapSchemaValuesFromSchema($schema, 'matchingRules', 'matchingRule'))
+            ->merge($this->mapSchemaValuesFromSchema($schema, 'matchingRuleUse', 'matchingRuleUse'))
+            ->merge($this->mapSchemaValuesFromSchema($schema, 'ldapSyntaxes', 'ldapSyntax'));
 
         if ($type) {
             $entries = $entries->filter(fn ($entry) => $entry->type === $type);
@@ -42,33 +47,31 @@ class LdapSchemaBrowserService
 
     public function getObjectClasses(): Collection
     {
-        return $this->mapSchemaValues('objectClasses', 'objectClass');
+        return $this->mapSchemaValuesFromSchema($this->readSchema(), 'objectClasses', 'objectClass');
     }
 
     public function getAttributeTypes(): Collection
     {
-        return $this->mapSchemaValues('attributeTypes', 'attributeType');
+        return $this->mapSchemaValuesFromSchema($this->readSchema(), 'attributeTypes', 'attributeType');
     }
 
     public function getMatchingRules(): Collection
     {
-        return $this->mapSchemaValues('matchingRules', 'matchingRule');
+        return $this->mapSchemaValuesFromSchema($this->readSchema(), 'matchingRules', 'matchingRule');
     }
 
     public function getMatchingRuleUse(): Collection
     {
-        return $this->mapSchemaValues('matchingRuleUse', 'matchingRuleUse');
+        return $this->mapSchemaValuesFromSchema($this->readSchema(), 'matchingRuleUse', 'matchingRuleUse');
     }
 
     public function getSyntaxes(): Collection
     {
-        return $this->mapSchemaValues('ldapSyntaxes', 'ldapSyntax');
+        return $this->mapSchemaValuesFromSchema($this->readSchema(), 'ldapSyntaxes', 'ldapSyntax');
     }
 
-    protected function mapSchemaValues(string $attribute, string $type): Collection
+    protected function mapSchemaValuesFromSchema(array $schema, string $attribute, string $type): Collection
     {
-        $schema = $this->readSchema();
-
         $values = $schema[$attribute] ?? [];
 
         return collect($values)
@@ -79,79 +82,89 @@ class LdapSchemaBrowserService
 
     protected function readSchema(): array
     {
-        if (! function_exists('ldap_connect')) {
-            return [];
+        if ($this->schemaCache !== null) {
+            return $this->schemaCache;
         }
 
-        $host = env('LDAP_HOST', '127.0.0.1');
-        $port = (int) env('LDAP_PORT', 389);
+        $cacheKey = 'ldap_schema_browser_full';
 
-        $bindDn = env('LDAP_USERNAME') ?: env('LDAP_BIND_DN');
-        $bindPassword = env('LDAP_PASSWORD') ?: env('LDAP_BIND_PASSWORD');
-
-        $connection = @ldap_connect($host, $port);
-
-        if (! $connection) {
-            return [];
-        }
-
-        ldap_set_option($connection, LDAP_OPT_PROTOCOL_VERSION, 3);
-        ldap_set_option($connection, LDAP_OPT_REFERRALS, 0);
-
-        if (! @ldap_bind($connection, $bindDn, $bindPassword)) {
-            return [];
-        }
-
-        $rootDseSearch = @ldap_read(
-            $connection,
-            '',
-            '(objectClass=*)',
-            ['subschemaSubentry']
-        );
-
-        $subschemaDn = 'cn=subschema';
-
-        if ($rootDseSearch) {
-            $rootEntries = @ldap_get_entries($connection, $rootDseSearch);
-
-            if (
-                isset($rootEntries[0]['subschemasubentry'][0]) &&
-                filled($rootEntries[0]['subschemasubentry'][0])
-            ) {
-                $subschemaDn = $rootEntries[0]['subschemasubentry'][0];
+        $this->schemaCache = Cache::remember($cacheKey, now()->addMinutes(5), function () {
+            if (! function_exists('ldap_connect')) {
+                return [];
             }
-        }
 
-        $schemaSearch = @ldap_read(
-            $connection,
-            $subschemaDn,
-            '(objectClass=*)',
-            [
-                'objectClasses',
-                'attributeTypes',
-                'matchingRules',
-                'matchingRuleUse',
-                'ldapSyntaxes',
-            ]
-        );
+            $host = env('LDAP_HOST', '127.0.0.1');
+            $port = (int) env('LDAP_PORT', 389);
 
-        if (! $schemaSearch) {
-            return [];
-        }
+            $bindDn = env('LDAP_USERNAME') ?: env('LDAP_BIND_DN');
+            $bindPassword = env('LDAP_PASSWORD') ?: env('LDAP_BIND_PASSWORD');
 
-        $entries = @ldap_get_entries($connection, $schemaSearch);
+            $connection = @ldap_connect($host, $port);
 
-        if (! isset($entries[0])) {
-            return [];
-        }
+            if (! $connection) {
+                return [];
+            }
 
-        return [
-            'objectClasses'   => $this->extractValues($entries[0], 'objectclasses'),
-            'attributeTypes'  => $this->extractValues($entries[0], 'attributetypes'),
-            'matchingRules'   => $this->extractValues($entries[0], 'matchingrules'),
-            'matchingRuleUse' => $this->extractValues($entries[0], 'matchingruleuse'),
-            'ldapSyntaxes'    => $this->extractValues($entries[0], 'ldapsyntaxes'),
-        ];
+            ldap_set_option($connection, LDAP_OPT_PROTOCOL_VERSION, 3);
+            ldap_set_option($connection, LDAP_OPT_REFERRALS, 0);
+
+            if (! @ldap_bind($connection, $bindDn, $bindPassword)) {
+                return [];
+            }
+
+            $rootDseSearch = @ldap_read(
+                $connection,
+                '',
+                '(objectClass=*)',
+                ['subschemaSubentry']
+            );
+
+            $subschemaDn = 'cn=subschema';
+
+            if ($rootDseSearch) {
+                $rootEntries = @ldap_get_entries($connection, $rootDseSearch);
+
+                if (
+                    isset($rootEntries[0]['subschemasubentry'][0]) &&
+                    filled($rootEntries[0]['subschemasubentry'][0])
+                ) {
+                    $subschemaDn = $rootEntries[0]['subschemasubentry'][0];
+                }
+            }
+
+            $schemaSearch = @ldap_read(
+                $connection,
+                $subschemaDn,
+                '(objectClass=*)',
+                [
+                    'objectClasses',
+                    'attributeTypes',
+                    'matchingRules',
+                    'matchingRuleUse',
+                    'ldapSyntaxes',
+                ]
+            );
+
+            if (! $schemaSearch) {
+                return [];
+            }
+
+            $entries = @ldap_get_entries($connection, $schemaSearch);
+
+            if (! isset($entries[0])) {
+                return [];
+            }
+
+            return [
+                'objectClasses'   => $this->extractValues($entries[0], 'objectclasses'),
+                'attributeTypes'  => $this->extractValues($entries[0], 'attributetypes'),
+                'matchingRules'   => $this->extractValues($entries[0], 'matchingrules'),
+                'matchingRuleUse' => $this->extractValues($entries[0], 'matchingruleuse'),
+                'ldapSyntaxes'    => $this->extractValues($entries[0], 'ldapsyntaxes'),
+            ];
+        });
+
+        return $this->schemaCache;
     }
 
     protected function extractValues(array $entry, string $key): array
@@ -184,71 +197,58 @@ class LdapSchemaBrowserService
 
         $entry->id = md5($type . '|' . $raw);
         $entry->type = $type;
-        $entry->name = $name ?: $oid;
+        $entry->name = $name;
         $entry->oid = $oid;
-        $entry->description = $this->extractDesc($raw);
-        $entry->sup = $this->extractSingleValue($raw, 'SUP');
-        $entry->must = $this->extractListValue($raw, 'MUST');
-        $entry->may = $this->extractListValue($raw, 'MAY');
+        $entry->description = $this->extractDescription($raw);
+        $entry->sup = $this->extractSup($raw);
         $entry->raw = $raw;
 
         return $entry;
     }
 
-    protected function extractOid(string $raw): string
+    protected function extractName(string $raw): ?string
     {
-        if (preg_match('/^\(\s*([0-9.]+)/', $raw, $matches)) {
+        if (preg_match("/NAME\\s+'([^']+)'/i", $raw, $matches) === 1) {
             return $matches[1];
         }
 
-        return '';
-    }
-
-    protected function extractName(string $raw): string
-    {
-        if (preg_match("/NAME\s+'([^']+)'/", $raw, $matches)) {
+        if (preg_match("/NAME\\s+\\(\\s*'([^']+)'/i", $raw, $matches) === 1) {
             return $matches[1];
         }
 
-        if (preg_match("/NAME\s+\(\s+'([^']+)'/", $raw, $matches)) {
+        return null;
+    }
+
+    protected function extractOid(string $raw): ?string
+    {
+        if (preg_match('/\\(\\s*([0-9.]+)/', $raw, $matches) === 1) {
             return $matches[1];
         }
 
-        return '';
+        return null;
     }
 
-    protected function extractDesc(string $raw): string
+    protected function extractDescription(string $raw): ?string
     {
-        if (preg_match("/DESC\s+'([^']+)'/", $raw, $matches)) {
+        if (preg_match("/DESC\\s+'([^']+)'/i", $raw, $matches) === 1) {
             return $matches[1];
         }
 
-        return '';
+        return null;
     }
 
-    protected function extractSingleValue(string $raw, string $key): string
+    protected function extractSup(string $raw): ?string
     {
-        if (preg_match('/' . preg_quote($key, '/') . '\s+([^\s\)]+)/', $raw, $matches)) {
-            return trim($matches[1], " '");
+        if (preg_match('/SUP\\s+([a-zA-Z0-9_-]+)/i', $raw, $matches) === 1) {
+            return $matches[1];
         }
 
-        return '';
+        return null;
     }
 
-    protected function extractListValue(string $raw, string $key): array
+    public function clearCache(): void
     {
-        if (preg_match('/' . preg_quote($key, '/') . '\s+\(\s*([^)]+)\)/', $raw, $matches)) {
-            return collect(explode('$', $matches[1]))
-                ->map(fn ($item) => trim($item, " \t\n\r\0\x0B'"))
-                ->filter()
-                ->values()
-                ->all();
-        }
-
-        if (preg_match('/' . preg_quote($key, '/') . '\s+([^\s\)]+)/', $raw, $matches)) {
-            return [trim($matches[1], " '")];
-        }
-
-        return [];
+        $this->schemaCache = null;
+        Cache::forget('ldap_schema_browser_full');
     }
 }

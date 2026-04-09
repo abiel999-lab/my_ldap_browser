@@ -28,6 +28,9 @@ class LdapDirectoryService
 
         ldap_set_option($connection, LDAP_OPT_PROTOCOL_VERSION, 3);
         ldap_set_option($connection, LDAP_OPT_REFERRALS, 0);
+        $timeout = (int) env('LDAP_TIMEOUT', 5);
+        ldap_set_option($connection, LDAP_OPT_NETWORK_TIMEOUT, $timeout);
+        ldap_set_option($connection, LDAP_OPT_TIMELIMIT, $timeout);
 
         if (! @ldap_bind($connection, $bindDn, $bindPassword)) {
             throw new RuntimeException('Gagal bind ke LDAP. Cek DN dan password.');

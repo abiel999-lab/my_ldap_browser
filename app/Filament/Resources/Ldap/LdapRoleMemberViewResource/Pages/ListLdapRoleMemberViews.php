@@ -8,12 +8,12 @@ use App\Models\LdapUserView;
 use App\Services\Ldap\LdapAuditTrailService;
 use App\Services\Ldap\LdapRoleAssignmentService;
 use App\Services\Ldap\LdapRoleSyncService;
-use App\Services\Ldap\LdapUserSyncService;
 use Filament\Actions;
 use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection as SupportCollection;
 
 class ListLdapRoleMemberViews extends ListRecords
 {
@@ -26,15 +26,9 @@ class ListLdapRoleMemberViews extends ListRecords
         $this->role = request()->query('role');
     }
 
-    protected function getTableQuery(): Builder
+    public function getTitle(): string
     {
-        $query = parent::getTableQuery();
-
-        if ($this->role) {
-            $query->where('role_cn', $this->role);
-        }
-
-        return $query;
+        return 'Role Members - ' . ($this->role ?: '-');
     }
 
     protected function getHeaderActions(): array
@@ -47,175 +41,155 @@ class ListLdapRoleMemberViews extends ListRecords
                 ->form([
                     Select::make('uid')
                         ->label('User')
+                        ->options(fn () => LdapUserView::query()
+                            ->orderBy('uid')
+                            ->get()
+                            ->mapWithKeys(fn ($user) => [
+                                $user->uid => "{$user->uid} - {$user->cn}"
+                            ])
+                            ->toArray()
+                        )
                         ->searchable()
-                        ->required()
-                        ->options(function () {
-                            return LdapUserView::query()
-                                ->orderBy('uid')
-                                ->get()
-                                ->mapWithKeys(fn ($user) => [
-                                    $user->uid => $user->uid . ' - ' . ($user->cn ?? '-'),
-                                ])
-                                ->toArray();
-                        }),
+                        ->required(),
                 ])
-                ->action(function (array $data): void {
-                    if (! $this->role) {
-                        throw new \Exception('Role tidak ditemukan dari URL.');
-                    }
-
-                    $ldapStatus = 'failed';
-                    $syncStatus = 'not_run';
-
+                ->action(function (array $data) {
                     try {
-                        app(LdapRoleAssignmentService::class)->assignRole($data['uid'], $this->role);
-                        $ldapStatus = 'success';
-
-                        try {
-                            app(LdapRoleSyncService::class)->sync();
-                            app(LdapUserSyncService::class)->sync();
-                            $syncStatus = 'success';
-                        } catch (\Throwable $syncException) {
-                            $syncStatus = 'failed';
-                        }
-
-                        app(LdapAuditTrailService::class)->log(
-                            action: 'add_user_to_role',
-                            targetUid: $data['uid'],
-                            targetDn: "uid={$data['uid']},ou=people,dc=petra,dc=ac,dc=id",
-                            beforeData: null,
-                            afterData: [
-                                'role' => $this->role,
-                                'uid' => $data['uid'],
-                            ],
-                            status: $syncStatus === 'success' ? 'success' : 'warning',
-                            ldapStatus: $ldapStatus,
-                            syncStatus: $syncStatus,
-                            message: $syncStatus === 'success'
-                                ? 'User added to role successfully.'
-                                : 'User added to role successfully, but local sync failed.',
-                            errorMessage: null
+                        app(LdapRoleAssignmentService::class)->assignRole(
+                            (string) $data['uid'],
+                            (string) $this->role
                         );
+
+                        app(LdapRoleSyncService::class)->sync();
 
                         Notification::make()
+                            ->title('User added to role successfully')
                             ->success()
-                            ->title('User added to role')
                             ->send();
 
-                        $this->redirect(
-                            LdapRoleMemberViewResource::getUrl('index', ['role' => $this->role]),
-                            navigate: true
-                        );
+                        $this->redirect(request()->fullUrl());
                     } catch (\Throwable $e) {
-                        app(LdapAuditTrailService::class)->log(
-                            action: 'add_user_to_role',
-                            targetUid: $data['uid'] ?? null,
-                            targetDn: null,
-                            beforeData: null,
-                            afterData: [
-                                'role' => $this->role,
-                                'uid' => $data['uid'] ?? null,
-                            ],
-                            status: 'failed',
-                            ldapStatus: $ldapStatus,
-                            syncStatus: $syncStatus,
-                            message: 'Add user to role failed.',
-                            errorMessage: $e->getMessage()
-                        );
-
-                        throw $e;
+                        Notification::make()
+                            ->title('Failed to add user to role')
+                            ->body($e->getMessage())
+                            ->danger()
+                            ->send();
                     }
+                }),
+
+            Actions\Action::make('batchAddUsersToRole')
+                ->label('Batch Add Users')
+                ->icon('heroicon-o-user-plus')
+                ->color('primary')
+                ->form([
+                    Select::make('uids')
+                        ->label('Users')
+                        ->multiple()
+                        ->options(fn () => LdapUserView::query()
+                            ->orderBy('uid')
+                            ->get()
+                            ->mapWithKeys(fn ($user) => [
+                                $user->uid => "{$user->uid} - {$user->cn}"
+                            ])
+                            ->toArray()
+                        )
+                        ->searchable()
+                        ->required(),
+                ])
+                ->action(function (array $data) {
+                    $uids = collect($data['uids'] ?? [])->filter()->values();
+                    $success = 0;
+                    $failed = 0;
+                    $audit = app(LdapAuditTrailService::class);
+
+                    foreach ($uids as $uid) {
+                        try {
+                            app(LdapRoleAssignmentService::class)->assignRole(
+                                (string) $uid,
+                                (string) $this->role
+                            );
+
+                            $success++;
+
+                            $audit->log(
+                                action: 'add_user_to_role_batch',
+                                targetUid: (string) $uid,
+                                targetDn: null,
+                                beforeData: null,
+                                afterData: ['role' => $this->role],
+                                status: 'success',
+                                ldapStatus: 'success',
+                                syncStatus: 'not_run',
+                                message: 'User added to role successfully via batch add.',
+                                errorMessage: null
+                            );
+                        } catch (\Throwable $e) {
+                            $failed++;
+
+                            $audit->log(
+                                action: 'add_user_to_role_batch',
+                                targetUid: (string) $uid,
+                                targetDn: null,
+                                beforeData: null,
+                                afterData: ['role' => $this->role],
+                                status: 'failed',
+                                ldapStatus: 'failed',
+                                syncStatus: 'not_run',
+                                message: 'Batch add user to role failed.',
+                                errorMessage: $e->getMessage()
+                            );
+                        }
+                    }
+
+                    app(LdapRoleSyncService::class)->sync();
+
+                    Notification::make()
+                        ->title("Batch add selesai. Success: {$success}, Failed: {$failed}")
+                        ->success()
+                        ->send();
+
+                    $this->redirect(request()->fullUrl());
                 }),
 
             Actions\Action::make('removeUserFromRole')
                 ->label('Remove User from Role')
                 ->icon('heroicon-o-trash')
                 ->color('danger')
+                ->requiresConfirmation()
                 ->form([
                     Select::make('uid')
-                        ->label('User in This Role')
-                        ->searchable()
-                        ->required()
+                        ->label('User')
                         ->options(function () {
-                            if (! $this->role) {
-                                return [];
-                            }
-
                             return LdapRoleMemberView::query()
                                 ->where('role_cn', $this->role)
+                                ->where('uid', '!=', 'dummy')
                                 ->orderBy('uid')
-                                ->get()
-                                ->mapWithKeys(fn ($row) => [
-                                    $row->uid => $row->uid . ' - ' . ($row->member_dn ?? '-'),
-                                ])
+                                ->pluck('uid', 'uid')
                                 ->toArray();
-                        }),
+                        })
+                        ->searchable()
+                        ->required(),
                 ])
-                ->action(function (array $data): void {
-                    if (! $this->role) {
-                        throw new \Exception('Role tidak ditemukan dari URL.');
-                    }
-
-                    $ldapStatus = 'failed';
-                    $syncStatus = 'not_run';
-
+                ->action(function (array $data) {
                     try {
-                        app(LdapRoleAssignmentService::class)->removeRole($data['uid'], $this->role);
-                        $ldapStatus = 'success';
-
-                        try {
-                            app(LdapRoleSyncService::class)->sync();
-                            app(LdapUserSyncService::class)->sync();
-                            $syncStatus = 'success';
-                        } catch (\Throwable $syncException) {
-                            $syncStatus = 'failed';
-                        }
-
-                        app(LdapAuditTrailService::class)->log(
-                            action: 'remove_user_from_role',
-                            targetUid: $data['uid'],
-                            targetDn: "uid={$data['uid']},ou=people,dc=petra,dc=ac,dc=id",
-                            beforeData: [
-                                'role' => $this->role,
-                                'uid' => $data['uid'],
-                            ],
-                            afterData: null,
-                            status: $syncStatus === 'success' ? 'success' : 'warning',
-                            ldapStatus: $ldapStatus,
-                            syncStatus: $syncStatus,
-                            message: $syncStatus === 'success'
-                                ? 'User removed from role successfully.'
-                                : 'User removed from role successfully, but local sync failed.',
-                            errorMessage: null
+                        app(LdapRoleAssignmentService::class)->removeRole(
+                            (string) $data['uid'],
+                            (string) $this->role
                         );
+
+                        app(LdapRoleSyncService::class)->sync();
 
                         Notification::make()
+                            ->title('User removed from role successfully')
                             ->success()
-                            ->title('User removed from role')
                             ->send();
 
-                        $this->redirect(
-                            LdapRoleMemberViewResource::getUrl('index', ['role' => $this->role]),
-                            navigate: true
-                        );
+                        $this->redirect(request()->fullUrl());
                     } catch (\Throwable $e) {
-                        app(LdapAuditTrailService::class)->log(
-                            action: 'remove_user_from_role',
-                            targetUid: $data['uid'] ?? null,
-                            targetDn: null,
-                            beforeData: [
-                                'role' => $this->role,
-                                'uid' => $data['uid'] ?? null,
-                            ],
-                            afterData: null,
-                            status: 'failed',
-                            ldapStatus: $ldapStatus,
-                            syncStatus: $syncStatus,
-                            message: 'Remove user from role failed.',
-                            errorMessage: $e->getMessage()
-                        );
-
-                        throw $e;
+                        Notification::make()
+                            ->title('Failed to remove user from role')
+                            ->body($e->getMessage())
+                            ->danger()
+                            ->send();
                     }
                 }),
 
@@ -223,27 +197,101 @@ class ListLdapRoleMemberViews extends ListRecords
                 ->label('Sync Role Members')
                 ->icon('heroicon-o-arrow-path')
                 ->color('gray')
-                ->action(function (): void {
+                ->action(function () {
                     app(LdapRoleSyncService::class)->sync();
-                    app(LdapUserSyncService::class)->sync();
 
                     Notification::make()
                         ->title('Role members synced successfully')
                         ->success()
                         ->send();
 
-                    $this->redirect(
-                        LdapRoleMemberViewResource::getUrl('index', ['role' => $this->role]),
-                        navigate: true
-                    );
+                    $this->redirect(request()->fullUrl());
                 }),
         ];
     }
 
-    public function getTitle(): string
+    protected function getTableQuery(): Builder
     {
-        return $this->role
-            ? 'Role Members - ' . $this->role
-            : 'Role Members';
+        $query = LdapRoleMemberView::query();
+
+        if ($this->role) {
+            $query->where('role_cn', $this->role);
+        }
+
+        return $query;
+    }
+
+    protected function getTableBulkActions(): array
+    {
+        return [
+            Actions\BulkAction::make('removeSelectedUsersFromRole')
+                ->label('Remove Selected Users from Role')
+                ->icon('heroicon-o-trash')
+                ->color('danger')
+                ->requiresConfirmation()
+                ->deselectRecordsAfterCompletion()
+                ->modalHeading('Remove selected users from role')
+                ->modalDescription('User yang dipilih akan dihapus dari role LDAP ini.')
+                ->action(function ($records) {
+                    $success = 0;
+                    $failed = 0;
+                    $audit = app(LdapAuditTrailService::class);
+
+                    foreach ($records as $record) {
+                        $uid = (string) $record->uid;
+
+                        if (strtolower($uid) === 'dummy') {
+                            $failed++;
+                            continue;
+                        }
+
+                        try {
+                            app(LdapRoleAssignmentService::class)->removeRole(
+                                $uid,
+                                (string) $this->role
+                            );
+
+                            $success++;
+
+                            $audit->log(
+                                action: 'remove_user_from_role_batch',
+                                targetUid: $uid,
+                                targetDn: $record->member_dn ?? $record->dn ?? null,
+                                beforeData: $record->toArray(),
+                                afterData: null,
+                                status: 'success',
+                                ldapStatus: 'success',
+                                syncStatus: 'not_run',
+                                message: 'User removed from role successfully via batch action.',
+                                errorMessage: null
+                            );
+                        } catch (\Throwable $e) {
+                            $failed++;
+
+                            $audit->log(
+                                action: 'remove_user_from_role_batch',
+                                targetUid: $uid,
+                                targetDn: $record->member_dn ?? $record->dn ?? null,
+                                beforeData: $record->toArray(),
+                                afterData: null,
+                                status: 'failed',
+                                ldapStatus: 'failed',
+                                syncStatus: 'not_run',
+                                message: 'Batch remove user from role failed.',
+                                errorMessage: $e->getMessage()
+                            );
+                        }
+                    }
+
+                    app(LdapRoleSyncService::class)->sync();
+
+                    Notification::make()
+                        ->title("Batch remove selesai. Success: {$success}, Failed: {$failed}")
+                        ->success()
+                        ->send();
+
+                    $this->redirect(request()->fullUrl());
+                }),
+        ];
     }
 }

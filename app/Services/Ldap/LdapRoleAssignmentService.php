@@ -255,4 +255,8 @@ class LdapRoleAssignmentService
 
         return array_values(array_unique($result));
     }
+    public function recalculateAffiliationFromKnownUser(string $uid): string
+    {
+        return $this->recalculateUserAffiliation($uid);
+    }
 }

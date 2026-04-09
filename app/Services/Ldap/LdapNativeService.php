@@ -25,6 +25,9 @@ class LdapNativeService
 
         ldap_set_option($conn, LDAP_OPT_PROTOCOL_VERSION, 3);
         ldap_set_option($conn, LDAP_OPT_REFERRALS, 0);
+        $timeout = (int) env('LDAP_TIMEOUT', 5);
+        ldap_set_option($conn, LDAP_OPT_NETWORK_TIMEOUT, $timeout);
+        ldap_set_option($conn, LDAP_OPT_TIMELIMIT, $timeout);
 
         $bind = @ldap_bind(
             $conn,

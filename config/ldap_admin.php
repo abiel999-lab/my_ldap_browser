@@ -19,6 +19,9 @@ return [
     'bind_dn' => env('LDAP_USERNAME'),
     'bind_password' => env('LDAP_PASSWORD'),
 
+    'schema_bind_dn' => env('LDAP_SCHEMA_BIND_DN', ''),
+    'schema_bind_password' => env('LDAP_SCHEMA_BIND_PASSWORD', ''),
+
     /*
     |--------------------------------------------------------------------------
     | Base DNs

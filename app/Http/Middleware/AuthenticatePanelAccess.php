@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Middleware;
 
 use App\Models\User;
+use App\Services\Oidc\OidcSessionAuthenticator;
 use Closure;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -14,36 +15,48 @@ use Symfony\Component\HttpFoundation\Response;
 class AuthenticatePanelAccess
 {
     public function __construct(
-        private readonly AuthenticateSSO $authenticateSSO
+        private readonly OidcSessionAuthenticator $sessionAuthenticator
     ) {
     }
 
     public function handle(Request $request, Closure $next): Response
     {
-        if ($this->shouldUseLocalAdmin()) {
-            if ($request->session()->get('local_admin_logged_in') === true) {
-                $sessionUser = $request->session()->get('local_admin_user', []);
-
-                $user = new User();
-                $user->id = $sessionUser['id'] ?? 'local-admin';
-                $user->name = $sessionUser['name'] ?? env('LOCAL_ADMIN_NAME', 'Local Admin');
-                $user->email = $sessionUser['email'] ?? env('LOCAL_ADMIN_EMAIL', 'local@example.com');
-                $user->is_local_admin = (bool) ($sessionUser['is_local_admin'] ?? true);
-
-                Auth::setUser($user);
-
-                return $next($request);
-            }
-
-            return new RedirectResponse(route('local.login'));
+        logger()->info('AUTH PANEL ACCESS CHECK', [
+            'auth_check' => Auth::check(),
+            'session_has_oidc_user' => (bool) $this->sessionAuthenticator->user(),
+            'url' => $request->fullUrl(),
+        ]);
+        if (Auth::check()) {
+            return $next($request);
         }
 
-        return $this->authenticateSSO->handle($request, $next);
-    }
+        $sessionUser = $this->sessionAuthenticator->user();
 
-    private function shouldUseLocalAdmin(): bool
-    {
-        return app()->environment('local')
-            && filter_var(env('LOCAL_ADMIN_ENABLED', false), FILTER_VALIDATE_BOOL);
+        if (! $sessionUser) {
+            $request->session()->put('petra_auth.intended_url', $request->fullUrl());
+
+            return new RedirectResponse(route('login'));
+        }
+
+        $email = (string) ($sessionUser['email'] ?? '');
+        $name = (string) ($sessionUser['name'] ?? 'Petra User');
+        $sub = (string) ($sessionUser['sub'] ?? $email);
+
+        $user = User::query()->firstOrNew([
+            'email' => $email !== '' ? $email : $sub,
+        ]);
+
+        $user->name = $name;
+        $user->email = $email !== '' ? $email : ($user->email ?: $sub);
+
+        if (! $user->exists) {
+            $user->password = bcrypt(\Illuminate\Support\Str::random(32));
+        }
+
+        $user->save();
+
+        Auth::login($user, true);
+
+        return $next($request);
     }
 }

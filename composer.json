@@ -9,7 +9,6 @@
     "license": "MIT",
     "require": {
         "php": "^8.3.2",
-        "aacotroneo/laravel-saml2": "^2.1",
         "bezhansalleh/filament-language-switch": "^4.0",
         "binarytorch/larecipe": "^2.8",
         "directorytree/ldaprecord-laravel": "^3.4",
@@ -23,6 +22,7 @@
         "league/flysystem-aws-s3-v3": "^3.30",
         "phpoffice/phpspreadsheet": "^5.5",
         "predis/predis": "^3.4",
+        "symfony/process": "^7.4",
         "tomatophp/filament-pwa": "~4.0"
     },
     "require-dev": {

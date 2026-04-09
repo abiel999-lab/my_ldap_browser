@@ -10,6 +10,29 @@ class LdapConnectionService
 {
     public function connect()
     {
+        return $this->connectWithCredentials(
+            bindDn: (string) config('ldap_admin.bind_dn'),
+            bindPassword: (string) config('ldap_admin.bind_password'),
+        );
+    }
+
+    public function connectSchema()
+    {
+        $schemaBindDn = (string) config('ldap_admin.schema_bind_dn');
+        $schemaBindPassword = (string) config('ldap_admin.schema_bind_password');
+
+        if ($schemaBindDn === '') {
+            throw new RuntimeException('LDAP schema bind DN belum di-set.');
+        }
+
+        return $this->connectWithCredentials(
+            bindDn: $schemaBindDn,
+            bindPassword: $schemaBindPassword,
+        );
+    }
+
+    protected function connectWithCredentials(string $bindDn, string $bindPassword)
+    {
         $host = (string) config('ldap_admin.host');
         $port = (int) config('ldap_admin.port');
         $timeout = (int) config('ldap_admin.timeout');
@@ -30,15 +53,12 @@ class LdapConnectionService
 
         if ($useTls) {
             if (! @ldap_start_tls($connection)) {
-                throw new RuntimeException('Failed to start LDAP TLS: '.$this->getLastError($connection));
+                throw new RuntimeException('Failed to start LDAP TLS: ' . $this->getLastError($connection));
             }
         }
 
-        $bindDn = (string) config('ldap_admin.bind_dn');
-        $bindPassword = (string) config('ldap_admin.bind_password');
-
         if (! @ldap_bind($connection, $bindDn, $bindPassword)) {
-            throw new RuntimeException('LDAP bind failed: '.$this->getLastError($connection));
+            throw new RuntimeException('LDAP bind failed: ' . $this->getLastError($connection));
         }
 
         return $connection;
@@ -51,7 +71,7 @@ class LdapConnectionService
         $search = @ldap_read($connection, '', '(objectClass=*)', ['*', '+']);
 
         if (! $search) {
-            throw new RuntimeException('Failed to read RootDSE: '.$this->getLastError($connection));
+            throw new RuntimeException('Failed to read RootDSE: ' . $this->getLastError($connection));
         }
 
         $entries = ldap_get_entries($connection, $search);
