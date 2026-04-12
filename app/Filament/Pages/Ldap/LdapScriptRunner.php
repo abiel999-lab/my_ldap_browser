@@ -6,12 +6,14 @@ use App\Models\LdapScriptRun;
 use App\Models\LdapUploadedScript;
 use App\Services\Ldap\LdapUploadedScriptRunnerService;
 use Filament\Actions;
-use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
 
 class LdapScriptRunner extends Page
 {
@@ -44,44 +46,84 @@ class LdapScriptRunner extends Page
                         ->label('Script Name')
                         ->required(),
 
-                    FileUpload::make('script_file')
-                        ->label('Script File')
+                    TextInput::make('original_filename')
+                        ->label('Original Filename')
                         ->required()
-                        ->disk('local')
-                        ->directory('ldap-scripts')
-                        ->preserveFilenames(),
+                        ->placeholder('test-script.sh')
+                        ->helperText('Boleh: .sh, .txt, .log, .conf, .cfg, .env, .json, .yaml, .yml, .ldif, .ps1, .bat, .cmd'),
+
+                    Textarea::make('script_content')
+                        ->label('Script Content')
+                        ->required()
+                        ->rows(18)
+                        ->autosize(),
                 ])
                 ->action(function (array $data) {
                     try {
-                        $storedPath = (string) ($data['script_file'] ?? '');
+                        $name = trim((string) ($data['name'] ?? ''));
+                        $originalFilename = trim((string) ($data['original_filename'] ?? ''));
+                        $scriptContent = (string) ($data['script_content'] ?? '');
 
-                        if ($storedPath === '') {
-                            throw new \RuntimeException('File script wajib diupload.');
+                        if ($name === '') {
+                            throw new \RuntimeException('Script Name wajib diisi.');
                         }
 
-                        $absolutePath = storage_path('app/' . $storedPath);
-
-                        if (! file_exists($absolutePath)) {
-                            throw new \RuntimeException('File upload tidak ditemukan di storage.');
+                        if ($originalFilename === '') {
+                            throw new \RuntimeException('Original Filename wajib diisi.');
                         }
 
-                        $originalFilename = basename($storedPath);
+                        if ($scriptContent === '') {
+                            throw new \RuntimeException('Script Content wajib diisi.');
+                        }
+
                         $extension = strtolower(pathinfo($originalFilename, PATHINFO_EXTENSION));
 
-                        if (! in_array($extension, ['sh', 'bat', 'cmd', 'ps1'], true)) {
-                            throw new \RuntimeException('Extension file tidak didukung. Gunakan .sh, .bat, .cmd, atau .ps1');
+                        $allowedExtensions = [
+                            'sh',
+                            'txt',
+                            'log',
+                            'conf',
+                            'cfg',
+                            'env',
+                            'json',
+                            'yaml',
+                            'yml',
+                            'ldif',
+                            'ps1',
+                            'bat',
+                            'cmd',
+                        ];
+
+                        if (! in_array($extension, $allowedExtensions, true)) {
+                            throw new \RuntimeException(
+                                'Extension file tidak didukung. Gunakan: .sh, .txt, .log, .conf, .cfg, .env, .json, .yaml, .yml, .ldif, .ps1, .bat, atau .cmd'
+                            );
                         }
 
-                        $content = file_get_contents($absolutePath);
+                        $safeFilename = Str::slug(pathinfo($originalFilename, PATHINFO_FILENAME));
+                        if ($safeFilename === '') {
+                            $safeFilename = 'script';
+                        }
+
+                        $storedFilename = now()->format('Ymd_His') . '_' . $safeFilename . '.' . $extension;
+                        $relativePath = 'ldap-scripts/' . $storedFilename;
+                        $absoluteDir = storage_path('app/ldap-scripts');
+                        $absolutePath = storage_path('app/' . $relativePath);
+
+                        if (! File::exists($absoluteDir)) {
+                            File::makeDirectory($absoluteDir, 0775, true);
+                        }
+
+                        File::put($absolutePath, $scriptContent);
 
                         $user = Auth::user();
 
                         $script = LdapUploadedScript::query()->create([
-                            'name' => (string) $data['name'],
+                            'name' => $name,
                             'original_filename' => $originalFilename,
-                            'stored_path' => $storedPath,
+                            'stored_path' => $relativePath,
                             'extension' => $extension,
-                            'script_content' => $content,
+                            'script_content' => $scriptContent,
                             'is_active' => true,
                             'uploaded_by_name' => $user->name ?? null,
                             'uploaded_by_email' => $user->email ?? null,
@@ -90,7 +132,8 @@ class LdapScriptRunner extends Page
                         $this->selectedScript = $script;
 
                         Notification::make()
-                            ->title('Script uploaded successfully')
+                            ->title('Script saved successfully')
+                            ->body('File disimpan ke storage/app/ldap-scripts')
                             ->success()
                             ->send();
                     } catch (\Throwable $e) {

@@ -129,7 +129,9 @@ class ListLdapAppViews extends ListRecords
                         ->success()
                         ->send();
 
-                    $this->redirect(request()->fullUrl());
+                    $this->redirect(static::getResource()::getUrl('index', array_filter([
+                        'app' => $this->app,
+                    ])));
                 }),
         ];
     }

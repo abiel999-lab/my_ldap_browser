@@ -32,6 +32,14 @@ class ListLdapAppRoleMemberViews extends ListRecords
         return 'App Role Members - ' . ($this->app ?: '-') . ' - ' . ($this->role ?: '-');
     }
 
+    protected function currentPageUrl(): string
+    {
+        return static::getResource()::getUrl('index', [
+            'app' => $this->app,
+            'role' => $this->role,
+        ]);
+    }
+
     protected function getHeaderActions(): array
     {
         return [
@@ -74,7 +82,7 @@ class ListLdapAppRoleMemberViews extends ListRecords
                             ->success()
                             ->send();
 
-                        $this->redirect(request()->fullUrl());
+                        $this->redirect($this->currentPageUrl());
                     } catch (\Throwable $e) {
                         Notification::make()
                             ->title('Failed to add user to app role')
@@ -162,7 +170,7 @@ class ListLdapAppRoleMemberViews extends ListRecords
                         ->success()
                         ->send();
 
-                    $this->redirect(request()->fullUrl());
+                    $this->redirect($this->currentPageUrl());
                 }),
 
             Actions\Action::make('removeUserFromRole')
@@ -222,7 +230,7 @@ class ListLdapAppRoleMemberViews extends ListRecords
                             ->success()
                             ->send();
 
-                        $this->redirect(request()->fullUrl());
+                        $this->redirect($this->currentPageUrl());
                     } catch (\Throwable $e) {
                         Notification::make()
                             ->title('Failed to remove user from app role')
@@ -244,7 +252,7 @@ class ListLdapAppRoleMemberViews extends ListRecords
                         ->success()
                         ->send();
 
-                    $this->redirect(request()->fullUrl());
+                    $this->redirect($this->currentPageUrl());
                 }),
         ];
     }
@@ -347,7 +355,7 @@ class ListLdapAppRoleMemberViews extends ListRecords
                         ->success()
                         ->send();
 
-                    $this->redirect(request()->fullUrl());
+                    $this->redirect($this->currentPageUrl());
                 }),
         ];
     }

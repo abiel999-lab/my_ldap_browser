@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\AuthController;
 use Illuminate\Support\Facades\Route;
+use Livewire\Livewire;
 
 Route::middleware('web')->group(function () {
     Route::get('/login', [AuthController::class, 'login'])->name('login');
@@ -14,4 +15,8 @@ Route::middleware('web')->group(function () {
 
     Route::view('/petra-network-required', 'petra-network-required')
         ->name('petra.network.required');
+});
+
+Livewire::setUpdateRoute(function ($handle) {
+    return Route::post('/livewire/update', $handle)->middleware(['web']);
 });
